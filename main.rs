@@ -1,12 +1,20 @@
-use derive_builder::Builder;
+use derive_debug::CustomDebug;
 
-#[derive(Builder)]
-pub struct Command {
-    executable: String,
-    #[builder(eac = "arg")]
-    args: Vec<String>,
-    env: Vec<String>,
-    current_dir: Option<String>,
+#[derive(CustomDebug)]
+pub struct Field<T> {
+    value: T,
+    #[debug = "0b{:08b}"]
+    bitmask: u8,
 }
 
-fn main() {}
+fn main() {
+    let f = Field {
+        value: "F",
+        bitmask: 0b00011100,
+    };
+
+    let debug = format!("{:?}", f);
+    let expected = r#"Field { value: "F", bitmask: 0b00011100 }"#;
+
+    assert_eq!(debug, expected);
+}

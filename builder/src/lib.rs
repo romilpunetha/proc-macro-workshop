@@ -46,7 +46,6 @@ fn get_builder_struct(fields: &syn::Fields, ast: &syn::DeriveInput) -> proc_macr
     }
 }
 
-
 fn get_identity_impl(fields: &syn::Fields, ast: &syn::DeriveInput) -> proc_macro2::TokenStream {
     let name = &ast.ident;
     let builder_name = format_ident!("{}Builder", name);
@@ -135,7 +134,6 @@ fn get_setter_methods(fields: &syn::Fields) -> proc_macro2::TokenStream {
     }
 }
 
-
 fn get_single_setter(f: &syn::Field) -> proc_macro2::TokenStream {
     let field_name = &f.ident;
     let ty = &f.ty;
@@ -143,18 +141,18 @@ fn get_single_setter(f: &syn::Field) -> proc_macro2::TokenStream {
 
     if inner_ty.is_some() {
         quote! {
-                 fn #field_name(&mut self, #field_name: #inner_ty) -> &mut Self {
-                    self.#field_name = std::option::Option::Some(#field_name);
-                    self
-                }
+             fn #field_name(&mut self, #field_name: #inner_ty) -> &mut Self {
+                self.#field_name = std::option::Option::Some(#field_name);
+                self
             }
+        }
     } else {
         quote! {
-                 fn #field_name(&mut self, #field_name: #ty) -> &mut Self {
-                    self.#field_name = std::option::Option::Some(#field_name);
-                    self
-                }
+             fn #field_name(&mut self, #field_name: #ty) -> &mut Self {
+                self.#field_name = std::option::Option::Some(#field_name);
+                self
             }
+        }
     }
 }
 
@@ -175,25 +173,18 @@ fn get_multi_setter(method_name: &String, f: &syn::Field) -> proc_macro2::TokenS
     }
 }
 
-
 fn extract_inner_type<'t>(ty: &'t syn::Type, expected_ident: &str) -> Option<&'t syn::Type> {
-    if let syn::Type::Path(
-        syn::TypePath {
-            path: syn::Path {
-                segments,
-                ..
-            },
-            ..
-        }) = ty {
-        if let std::option::Option::Some(
-            syn::PathSegment {
-                ident,
-                arguments:
-                syn::PathArguments::AngleBracketed(
-                    syn::AngleBracketedGenericArguments {
-                        args, ..
-                    }),
-            }) = segments.last() {
+    if let syn::Type::Path(syn::TypePath {
+        path: syn::Path { segments, .. },
+        ..
+    }) = ty
+    {
+        if let std::option::Option::Some(syn::PathSegment {
+            ident,
+            arguments:
+                syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments { args, .. }),
+        }) = segments.last()
+        {
             if ident == expected_ident {
                 if let std::option::Option::Some(syn::GenericArgument::Type(ty)) = args.last() {
                     return std::option::Option::Some(ty);
@@ -204,23 +195,27 @@ fn extract_inner_type<'t>(ty: &'t syn::Type, expected_ident: &str) -> Option<&'t
     None
 }
 
-fn extract_each_attr_value(attrs: &[syn::Attribute]) -> std::result::Result<String, proc_macro2::TokenStream> {
+fn extract_each_attr_value(
+    attrs: &[syn::Attribute],
+) -> std::result::Result<String, proc_macro2::TokenStream> {
     if let std::option::Option::Some(attr) = attrs.last() {
         if let std::result::Result::Ok(syn::Meta::List(list)) = attr.parse_meta() {
             if list.path.is_ident("builder") {
-                if let std::option::Option::Some(
-                    syn::NestedMeta::Meta(
-                        syn::Meta::NameValue(
-                            syn::MetaNameValue {
-                                path,
-                                lit: syn::Lit::Str(lit_str),
-                                ..
-                            }))) = list.nested.last() {
+                if let std::option::Option::Some(syn::NestedMeta::Meta(syn::Meta::NameValue(
+                    syn::MetaNameValue {
+                        path,
+                        lit: syn::Lit::Str(lit_str),
+                        ..
+                    },
+                ))) = list.nested.last()
+                {
                     return if path.is_ident("each") {
                         std::result::Result::Ok(lit_str.value())
                     } else {
-                        std::result::Result::Err(syn::Error::new_spanned(list, "expected `builder(each = \"...\")`")
-                            .to_compile_error())
+                        std::result::Result::Err(
+                            syn::Error::new_spanned(list, "expected `builder(each = \"...\")`")
+                                .to_compile_error(),
+                        )
                     };
                 }
             }
