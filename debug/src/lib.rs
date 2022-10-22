@@ -1,3 +1,5 @@
+extern crate core;
+
 use quote::quote;
 use syn::{parse_macro_input, parse_quote};
 
@@ -16,7 +18,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
     };
 
-    let generics = add_trait_bounds(ast.generics);
+    let generics = add_trait_bounds(fields, ast.generics);
 
     let (impl_generics, ty_generics, where_clause) = &generics.split_for_impl();
 
@@ -69,14 +71,76 @@ fn get_formatted_attr_value(attrs: &[syn::Attribute]) -> std::option::Option<Str
             }
         }
     }
-    return std::option::Option::None;
+    None
 }
 
-fn add_trait_bounds(mut generics: syn::Generics) -> syn::Generics {
-    for param in &mut generics.params {
-        if let syn::GenericParam::Type(ref mut type_param) = *param {
-            type_param.bounds.push(parse_quote!(std::fmt::Debug));
+fn add_trait_bounds(fields: &syn::Fields, generics: syn::Generics) -> syn::Generics {
+    let mut phantom_ty_idents = std::collections::HashSet::new();
+    let mut non_phantom_ty_idents = std::collections::HashSet::new();
+    let mut g = generics;
+    for field in fields {
+        match extract_ty_idents(field) {
+            None => {}
+            Some((ident, Some(ty))) => {
+                if ident == "PhantomData" {
+                    phantom_ty_idents.insert(ty);
+                }
+            }
+            Some((ident, None)) => {
+                non_phantom_ty_idents.insert(ident);
+            }
         }
     }
-    generics
+
+    for param in &mut g.params {
+        if let syn::GenericParam::Type(type_param) = param {
+            if !phantom_ty_idents.contains(&type_param.ident) {
+                type_param.bounds.push(parse_quote!(std::fmt::Debug));
+            }
+        }
+    }
+    g
+}
+
+fn extract_ty_idents(
+    field: &syn::Field,
+) -> Option<(&syn::Ident, std::option::Option<&syn::Ident>)> {
+    if let syn::Type::Path(syn::TypePath {
+        path: syn::Path { segments, .. },
+        ..
+    }) = &field.ty
+    {
+        if let std::option::Option::Some(syn::PathSegment {
+            ident,
+            arguments:
+                syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments { args, .. }),
+        }) = segments.last()
+        {
+            if let std::option::Option::Some(syn::GenericArgument::Type(ty)) = args.last() {
+                match extract_inner_type(ty) {
+                    None => {}
+                    Some(inner_type) => {
+                        return std::option::Option::Some((ident, Some(inner_type)));
+                    }
+                }
+            }
+            return std::option::Option::Some((ident, None));
+        } else if let std::option::Option::Some(syn::PathSegment { ident, .. }) = segments.last() {
+            return std::option::Option::Some((ident, std::option::Option::None));
+        }
+    }
+    std::option::Option::None
+}
+
+fn extract_inner_type(ty: &syn::Type) -> Option<&syn::Ident> {
+    if let syn::Type::Path(syn::TypePath {
+        path: syn::Path { segments, .. },
+        ..
+    }) = ty
+    {
+        if let std::option::Option::Some(syn::PathSegment { ident, .. }) = segments.last() {
+            return std::option::Option::Some(ident);
+        }
+    }
+    None
 }
